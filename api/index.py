@@ -29,7 +29,7 @@ def get_settings():
     return Settings()
 
 settings = get_settings()
-DATABASE_URL = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+DATABASE_URL = "postgresql://postgres.ivrenuyrenupokqgenrz:benchgrsan2026@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
