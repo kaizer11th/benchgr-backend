@@ -75,7 +75,11 @@ ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
 
-def hash_password(p): return pwd_context.hash(p)
+def hash_password(p: str):
+    # bcrypt supports up to 72 bytes, so truncate longer passwords
+    if p is None:
+        p = ""
+    return pwd_context.hash(p[:72])
 def verify_password(p, h): return pwd_context.verify(p, h)
 
 def create_access_token(data, expires_delta=None):
