@@ -69,7 +69,7 @@ class BenchmarkResult(Base):
     notes          = Column(Text, nullable=True)
     user           = relationship("User", back_populates="results")
 
-Base.metadata.create_all(bind=engine)
+# Tables created lazily on first request
 
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -144,7 +144,12 @@ app = FastAPI(title="BenchGR API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/")
-def root(): return {"status": "ok", "service": "BenchGR API v1.0"}
+def root():
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass
+    return {"status": "ok", "service": "BenchGR API v1.0"}
 
 @app.get("/health")
 def health(): return {"status": "healthy"}
