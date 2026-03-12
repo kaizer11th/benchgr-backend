@@ -9,11 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Text, func, desc
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
+from sqlalchemy.pool import NullPool
 from pydantic import BaseModel, EmailStr
 from pydantic_settings import BaseSettings
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from mangum import Mangum
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://user:pass@localhost:5432/benchgr"
@@ -29,7 +31,8 @@ def get_settings():
 
 settings = get_settings()
 DATABASE_URL = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+engine = create_engine(DATABASE_URL, poolclass=NullPool)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -42,34 +45,32 @@ def get_db():
 
 class User(Base):
     __tablename__ = "users"
-    id            = Column(Integer, primary_key=True, index=True)
-    username      = Column(String(50), unique=True, index=True, nullable=False)
-    email         = Column(String(255), unique=True, index=True, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    api_key       = Column(String(64), unique=True, index=True, default=lambda: secrets.token_hex(32))
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
-    results       = relationship("BenchmarkResult", back_populates="user")
+    api_key = Column(String(64), unique=True, index=True, default=lambda: secrets.token_hex(32))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    results = relationship("BenchmarkResult", back_populates="user")
 
 class BenchmarkResult(Base):
     __tablename__ = "benchmark_results"
-    id             = Column(Integer, primary_key=True, index=True)
-    user_id        = Column(Integer, ForeignKey("users.id"), nullable=False)
-    gpu_name       = Column(String(100), nullable=False)
-    gpu_arch       = Column(String(100))
-    vram_gb        = Column(Integer)
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    gpu_name = Column(String(100), nullable=False)
+    gpu_arch = Column(String(100))
+    vram_gb = Column(Integer)
     driver_version = Column(String(50))
-    cuda_version   = Column(String(50))
+    cuda_version = Column(String(50))
     tokens_per_sec = Column(Float)
     images_per_sec = Column(Float)
-    tflops_fp16    = Column(Float)
+    tflops_fp16 = Column(Float)
     memory_bw_gbps = Column(Float)
-    neural_score   = Column(Float)
-    agent_version  = Column(String(20))
-    submitted_at   = Column(DateTime(timezone=True), server_default=func.now())
-    notes          = Column(Text, nullable=True)
-    user           = relationship("User", back_populates="results")
-
-# Tables created lazily on first request
+    neural_score = Column(Float)
+    agent_version = Column(String(20))
+    submitted_at = Column(DateTime(timezone=True), server_default=func.now())
+    notes = Column(Text, nullable=True)
+    user = relationship("User", back_populates="results")
 
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -143,12 +144,16 @@ class LeaderboardEntry(BaseModel):
 app = FastAPI(title="BenchGR API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-@app.get("/")
-def root():
+# Create tables on startup
+@app.on_event("startup")
+def startup():
     try:
         Base.metadata.create_all(bind=engine)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"DB init error: {e}")
+
+@app.get("/")
+def root():
     return {"status": "ok", "service": "BenchGR API v1.0"}
 
 @app.get("/health")
@@ -219,3 +224,6 @@ def stats(db: Session = Depends(get_db)):
         "best_image_ips": db.query(func.max(BenchmarkResult.images_per_sec)).scalar(),
         "best_tflops": db.query(func.max(BenchmarkResult.tflops_fp16)).scalar(),
         "best_membw_gbps": db.query(func.max(BenchmarkResult.memory_bw_gbps)).scalar()}
+
+# Required for Vercel serverless
+handler = Mangum(app)
