@@ -15,7 +15,6 @@ from pydantic_settings import BaseSettings
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from mangum import Mangum
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://user:pass@localhost:5432/benchgr"
@@ -224,6 +223,4 @@ def stats(db: Session = Depends(get_db)):
         "best_image_ips": db.query(func.max(BenchmarkResult.images_per_sec)).scalar(),
         "best_tflops": db.query(func.max(BenchmarkResult.tflops_fp16)).scalar(),
         "best_membw_gbps": db.query(func.max(BenchmarkResult.memory_bw_gbps)).scalar()}
-
-# Required for Vercel serverless
-handler = Mangum(app)
+    
