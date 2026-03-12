@@ -145,7 +145,17 @@ class LeaderboardEntry(BaseModel):
     neural_score: Optional[float]; submitted_at: datetime; username: str
 
 app = FastAPI(title="BenchGR API", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://benchgr-frontend.vercel.app"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_origin_regex="https://benchgr-frontend.*\\.vercel\\.app"
+)
 
 # Create tables on startup
 @app.on_event("startup")
