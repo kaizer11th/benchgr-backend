@@ -72,7 +72,7 @@ class BenchmarkResult(Base):
     user = relationship("User", back_populates="results")
 
 ALGORITHM = "HS256"
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 bearer_scheme = HTTPBearer()
 
 def hash_password(p: str):
